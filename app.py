@@ -46,12 +46,29 @@ st.set_page_config(page_title="Recipe Recommendation System", page_icon="🍽️
 st.title("🍽️ Recipe Recommendation System")
 st.write("Enter the ingredients you have, and get personalized recipe recommendations!")
 
-# Autocomplete dropdown for ingredients
+# Autocomplete dropdown for ingredients with auto-close feature
 selected_ingredients = st.multiselect(
     "Select Ingredients:", 
     options=ingredient_list, 
     default=[],
     placeholder="Start typing to search ingredients..."
+)
+
+# Inject JavaScript to auto-close dropdown after selection
+st.markdown(
+    """
+    <script>
+        var dropdown = window.parent.document.querySelector("[data-testid='stMultiSelect']");
+        if (dropdown) {
+            dropdown.addEventListener("change", function() {
+                setTimeout(() => {
+                    dropdown.blur();
+                }, 200);
+            });
+        }
+    </script>
+    """,
+    unsafe_allow_html=True
 )
 
 if st.button("Get Recommendations"):
