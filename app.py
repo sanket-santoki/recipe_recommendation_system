@@ -1,4 +1,10 @@
 import streamlit as st
+
+# ✅ Move set_page_config to the very first Streamlit command
+st.set_page_config(page_title="🍽️ Recipe Recommendation System", 
+                   page_icon="🥗", layout="wide")
+
+# ✅ Now import other libraries
 import pandas as pd
 import joblib
 import ast
