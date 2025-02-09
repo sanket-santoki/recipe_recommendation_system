@@ -3,6 +3,7 @@ import pandas as pd
 import joblib
 import ast
 import logging
+import plotly.express as px
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,15 +39,32 @@ def get_recipe_ingredients(ing):
 nn_model, vectorizer, df = load_models()
 
 # Streamlit UI
-st.set_page_config(page_title="Recipe Recommendation System", page_icon="🍽️", layout="wide")
+st.set_page_config(page_title="🍽️ Recipe Recommendation System", page_icon="🥗", layout="wide")
 
-st.title("🍽️ Recipe Recommendation System")
-st.write("Enter the ingredients you have, and get personalized recipe recommendations!")
+# Custom CSS for better UI
+st.markdown("""
+    <style>
+        .big-font { font-size:24px !important; font-weight: bold; }
+        .red-text { color: red; font-weight: bold; }
+        .green-text { color: green; font-weight: bold; }
+        .bold-text { font-weight: bold; }
+        .block-container { padding-top: 20px; }
+    </style>
+""", unsafe_allow_html=True)
+
+# Sidebar
+st.sidebar.header("🔍 Filter Recipes")
+min_rating = st.sidebar.slider("⭐ Minimum Rating", 1.0, 5.0, 3.0, 0.5)
+max_calories = st.sidebar.slider("🔥 Max Calories", 50, 1000, 500, 50)
+
+# Main UI
+st.title("🍽️ AI-Powered Recipe Recommendation System")
+st.markdown("<p class='big-font'>Discover the best recipes based on your ingredients! 🥗</p>", unsafe_allow_html=True)
 
 # Input field for ingredients
-ingredients = st.text_area("Enter ingredients (comma-separated)", placeholder="e.g., tomato, cheese, onion")
+ingredients = st.text_area("📝 Enter ingredients (comma-separated)", placeholder="e.g., tomato, cheese, onion")
 
-if st.button("Get Recommendations"):
+if st.button("🔍 Get Recommendations"):
     if ingredients.strip() and nn_model and vectorizer:
         # Process user input
         user_list = [s.strip().lower() for s in ingredients.split(",") if s.strip()]
@@ -86,40 +104,56 @@ if st.button("Get Recommendations"):
                     "ingredients_list": recipe_ingredients,
                     "available_ingredients": available,
                     "missing_ingredients": missing,
-                    "similarity": round(1 - dist, 2)
+                    "similarity": round(1 - dist, 2),
+                    "instructions": row.get("instructions", "No instructions available")
                 }
-                recommendations.append(rec)
+                if rec["aver_rate"] >= min_rating and rec["calories"] <= max_calories:
+                    recommendations.append(rec)
             except Exception as e:
                 logger.error(f"Error processing recipe {row['recipe_name']}: {e}")
 
         # Display results
         if recommendations:
-            st.subheader("Recommended Recipes:")
+            st.subheader(f"🍳 {len(recommendations)} Best Recipe(s) Found")
             
             for recipe in recommendations:
                 col1, col2 = st.columns([1, 2])
                 
                 with col1:
-                    st.image(recipe["image_url"], width=200)
+                    st.image(recipe["image_url"], width=220)
                 
                 with col2:
                     st.markdown(f"### 🍲 {recipe['recipe_name']}")
                     st.write(f"**⭐ Rating:** {recipe['aver_rate']} / 5 ({recipe['review_nums']} reviews)")
                     st.write(f"**🔥 Calories:** {recipe['calories']} kcal")
                     st.write(f"**🍽️ Similarity Score:** {recipe['similarity']}")
-                    
+
                     # Ingredients section
                     with st.expander("✅ Available Ingredients"):
                         st.write(", ".join(recipe["available_ingredients"]) if recipe["available_ingredients"] else "None")
-                    
+
                     with st.expander("❌ Missing Ingredients"):
                         st.write(", ".join(recipe["missing_ingredients"]) if recipe["missing_ingredients"] else "None")
-                    
-                    # Nutritional Information
-                    st.markdown("### 🥗 Nutritional Breakdown")
-                    st.write(f"**Fat:** {recipe['fat']} g | **Carbohydrates:** {recipe['carbohydrates']} g")
-                    st.write(f"**Protein:** {recipe['protein']} g | **Cholesterol:** {recipe['cholesterol']} mg")
-                    st.write(f"**Sodium:** {recipe['sodium']} mg | **Fiber:** {recipe['fiber']} g")
+
+                    # Nutritional Information as Chart
+                    nutrition_df = pd.DataFrame({
+                        "Nutrient": ["Fat", "Carbs", "Protein", "Cholesterol", "Sodium", "Fiber"],
+                        "Amount": [recipe["fat"], recipe["carbohydrates"], recipe["protein"],
+                                   recipe["cholesterol"], recipe["sodium"], recipe["fiber"]]
+                    })
+                    fig = px.bar(nutrition_df, x="Nutrient", y="Amount", title="📊 Nutritional Breakdown",
+                                 color="Nutrient", text_auto=True)
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Recipe Instructions
+                    with st.expander("📜 Recipe Instructions"):
+                        st.write(recipe["instructions"])
+
+                    # Save favorite recipes
+                    if st.button(f"💖 Save '{recipe['recipe_name']}' to Favorites"):
+                        with open("favorites.txt", "a") as f:
+                            f.write(recipe["recipe_name"] + "\n")
+                        st.success("Added to Favorites!")
 
                     st.write("---")
         else:
