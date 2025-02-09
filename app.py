@@ -3,114 +3,134 @@ import pandas as pd
 import joblib
 import ast
 import logging
-import plotly.express as px
 
-# ✅ Page Configuration (Mobile-Friendly)
-st.set_page_config(page_title="🍽️ Recipe Finder", page_icon="🥗", layout="centered")
-
-# ✅ Configure logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ✅ Load ML Artifacts
-try:
-    nn_model = joblib.load("recipe_nn_model.pkl")
-    vectorizer = joblib.load("tfidf_vectorizer.pkl")
-    df = joblib.load("recipe_data.pkl")
-    logger.info("Model artifacts loaded successfully.")
-except Exception as e:
-    logger.error("Error loading model artifacts: %s", e)
-    st.error("⚠️ Failed to load model. Please check the files.")
-    st.stop()
-
-# ✅ Extract Unique Ingredients for Search Suggestions
-all_ingredients = set()
-for ing_list in df["ingredients_list"]:
+# Load trained models and dataset
+@st.cache_resource
+def load_models():
     try:
-        parsed_ing = ast.literal_eval(ing_list)
-        if isinstance(parsed_ing, list):
-            all_ingredients.update(parsed_ing)
+        nn_model = joblib.load("recipe_nn_model.pkl")
+        vectorizer = joblib.load("tfidf_vectorizer.pkl")
+        df = joblib.load("recipe_data.pkl")
+        logger.info("Model and dataset loaded successfully.")
+        return nn_model, vectorizer, df
     except Exception as e:
-        logger.warning("Failed to parse ingredient list: %s", e)
+        st.error(f"Error loading model: {e}")
+        return None, None, None
 
-all_ingredients = sorted(all_ingredients)  # Sort for better UX
-
-# ✅ HOME PAGE UI
-st.markdown(
-    """
-    <style>
-        .title {text-align: center; font-size: 30px; font-weight: bold; margin-bottom: 20px;}
-        .subtext {text-align: center; color: gray; margin-bottom: 30px;}
-        .search-box {border-radius: 10px; padding: 10px; font-size: 16px;}
-        .search-button {background-color: #ff4b4b; color: white; font-size: 16px; padding: 10px; border-radius: 10px;}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-st.markdown("<div class='title'>🍽️ Recipe Finder</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtext'>Find the best recipes based on available ingredients!</div>", unsafe_allow_html=True)
-
-# 🔥 **Autocomplete Ingredient Selection**
-selected_ingredients = st.multiselect(
-    "Enter ingredients (Start typing...)", 
-    options=all_ingredients, 
-    default=[]
-)
-
-# 🔍 Search Button
-if st.button("Find Recipes 🍽️", key="search", help="Click to find recipes"):
-    if not selected_ingredients:
-        st.warning("⚠️ Please select at least one ingredient.")
-    else:
-        # ✅ Process Input
-        user_text = " ".join(selected_ingredients)
-        user_set = set(selected_ingredients)
+# Function to process ingredients
+def get_recipe_ingredients(ing):
+    if isinstance(ing, list):
+        return ing
+    if isinstance(ing, str):
         try:
+            parsed = ast.literal_eval(ing)
+            return list(parsed) if isinstance(parsed, (list, tuple)) else [str(parsed)]
+        except Exception as e:
+            logger.warning(f"Parsing error: {e}")
+            return [item.strip().strip("'\"") for item in ing.strip("[]").split(",") if item.strip()]
+    return []
+
+# Load models
+nn_model, vectorizer, df = load_models()
+
+# Get unique ingredient list from dataset
+ingredient_list = sorted(set(ing for sublist in df["ingredients_list"].dropna().apply(get_recipe_ingredients) for ing in sublist))
+
+# Streamlit UI
+st.set_page_config(page_title="Recipe Recommendation System", page_icon="🍽️", layout="wide")
+
+st.title("🍽️ Recipe Recommendation System")
+st.write("Enter the ingredients you have, and get personalized recipe recommendations!")
+
+# Autocomplete dropdown for ingredients
+selected_ingredients = st.multiselect(
+    "Select Ingredients:", 
+    options=ingredient_list, 
+    default=[],
+    placeholder="Start typing to search ingredients..."
+)
+
+if st.button("Get Recommendations"):
+    if selected_ingredients and nn_model and vectorizer:
+        # Process user input
+        user_list = [s.strip().lower() for s in selected_ingredients]
+        user_text = " ".join(user_list)
+        user_set = set(user_list)
+
+        try:
+            # Transform input into vector
             user_vector = vectorizer.transform([user_text])
             distances, indices = nn_model.kneighbors(user_vector)
         except Exception as e:
-            logger.error("Error during model inference: %s", e)
-            st.error("⚠️ Model inference failed.")
+            st.error(f"Error during model inference: {e}")
             st.stop()
-        
-        # ✅ Display Recipes
+
         recommendations = []
         for idx, dist in zip(indices[0], distances[0]):
             row = df.iloc[idx]
-            recipe_ingredients = list(ast.literal_eval(row["ingredients_list"]))
-            available = list(set(recipe_ingredients).intersection(user_set))
-            missing = list(set(recipe_ingredients) - user_set)
-            
-            rec = {
-                "recipe_name": row["recipe_name"],
-                "image_url": row["image_url"],
-                "calories": row["calories"],
-                "protein": row["protein"],
-                "carbohydrates": row["carbohydrates"],
-                "fat": row["fat"],
-                "available_ingredients": available,
-                "missing_ingredients": missing,
-                "recipe_link": f"https://www.allrecipes.com/search?q={row['recipe_name'].replace(' ', '+')}"
-            }
-            recommendations.append(rec)
-        
-        # ✅ UI for Displaying Recipes
-        if recommendations:
-            st.subheader("🍽️ Recommended Recipes")
-            for recipe in recommendations[:5]:  # Show Top 5
-                with st.container():
-                    st.markdown(f"<h3>{recipe['recipe_name']}</h3>", unsafe_allow_html=True)
-                    st.image(recipe["image_url"], width=300)
-                    st.write(f"🔥 Calories: {recipe['calories']} kcal")
-                    st.write(f"🍗 Protein: {recipe['protein']} g | 🥖 Carbs: {recipe['carbohydrates']} g | 🥑 Fat: {recipe['fat']} g")
-                    st.write(f"✅ Available: {', '.join(recipe['available_ingredients'])}")
-                    st.write(f"❌ Missing: {', '.join(recipe['missing_ingredients'])}")
-                    st.markdown(f"[📖 View Full Recipe]({recipe['recipe_link']})", unsafe_allow_html=True)
-                    st.markdown("---")
-        else:
-            st.warning("😕 No recipes found. Try different ingredients!")
+            recipe_ingredients = list(get_recipe_ingredients(row["ingredients_list"]))
+            recipe_set = set(s.strip().lower() for s in recipe_ingredients)
+            available = list(recipe_set.intersection(user_set))
+            missing = list(recipe_set - user_set)
 
-# ✅ Footer
-st.markdown("---")
-st.markdown("<p style='text-align:center;'>© 2025 Sanket Santoki | Recipe Recommendation System 🍽️</p>", unsafe_allow_html=True)
+            try:
+                rec = {
+                    "recipe_id": int(row["recipe_id"]),
+                    "recipe_name": row["recipe_name"],
+                    "image_url": row["image_url"],
+                    "aver_rate": float(row["aver_rate"]),
+                    "review_nums": int(row["review_nums"]),
+                    "calories": float(row["calories"]),
+                    "fat": float(row["fat"]),
+                    "carbohydrates": float(row["carbohydrates"]),
+                    "protein": float(row["protein"]),
+                    "cholesterol": float(row["cholesterol"]),
+                    "sodium": float(row["sodium"]),
+                    "fiber": float(row["fiber"]),
+                    "ingredients_list": recipe_ingredients,
+                    "available_ingredients": available,
+                    "missing_ingredients": missing,
+                    "similarity": round(1 - dist, 2)
+                }
+                recommendations.append(rec)
+            except Exception as e:
+                logger.error(f"Error processing recipe {row['recipe_name']}: {e}")
+
+        # Display results
+        if recommendations:
+            st.subheader("Recommended Recipes:")
+            
+            for recipe in recommendations:
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    st.image(recipe["image_url"], width=200)
+                
+                with col2:
+                    st.markdown(f"### 🍲 {recipe['recipe_name']}")
+                    st.write(f"**⭐ Rating:** {recipe['aver_rate']} / 5 ({recipe['review_nums']} reviews)")
+                    st.write(f"**🔥 Calories:** {recipe['calories']} kcal")
+                    st.write(f"**🍽️ Similarity Score:** {recipe['similarity']}")
+                    
+                    # Ingredients section
+                    with st.expander("✅ Available Ingredients"):
+                        st.write(", ".join(recipe["available_ingredients"]) if recipe["available_ingredients"] else "None")
+                    
+                    with st.expander("❌ Missing Ingredients"):
+                        st.write(", ".join(recipe["missing_ingredients"]) if recipe["missing_ingredients"] else "None")
+                    
+                    # Nutritional Information
+                    st.markdown("### 🥗 Nutritional Breakdown")
+                    st.write(f"**Fat:** {recipe['fat']} g | **Carbohydrates:** {recipe['carbohydrates']} g")
+                    st.write(f"**Protein:** {recipe['protein']} g | **Cholesterol:** {recipe['cholesterol']} mg")
+                    st.write(f"**Sodium:** {recipe['sodium']} mg | **Fiber:** {recipe['fiber']} g")
+
+                    st.write("---")
+        else:
+            st.warning("No matching recipes found. Try different ingredients.")
+    else:
+        st.warning("Please select at least one ingredient.")
