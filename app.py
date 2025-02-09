@@ -1,6 +1,6 @@
-import streamlit as st
+import streamlit as st  # ✅ Import Streamlit first
 
-# ✅ Move set_page_config to the very first Streamlit command
+# ✅ Set page configuration before anything else
 st.set_page_config(page_title="🍽️ Recipe Recommendation System", 
                    page_icon="🥗", layout="wide")
 
