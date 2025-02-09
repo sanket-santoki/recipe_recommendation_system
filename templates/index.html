@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Recipe Recommendation System</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 600px; margin: auto; }
+        .recipe { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        .recipe img { max-width: 100px; }
+        #results { margin-top: 20px; }
+        button { padding: 10px 15px; font-size: 16px; }
+        input { padding: 8px; font-size: 16px; width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Recipe Recommendation System</h1>
+        <p>Enter ingredients (comma-separated):</p>
+        <input type="text" id="ingredientsInput" placeholder="e.g., chicken, garlic, lemon">
+        <button id="recommendBtn">Get Recommendations</button>
+        <h2>Recommended Recipes:</h2>
+        <div id="results"></div>
+    </div>
+    <script>
+        document.getElementById("recommendBtn").addEventListener("click", function(){
+            var ingredients = document.getElementById("ingredientsInput").value;
+            if (!ingredients) {
+                alert("Please enter at least one ingredient.");
+                return;
+            }
+            
+            fetch("/recommend", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ ingredients: ingredients })
+            })
+            .then(response => response.json())
+            .then(data => {
+                var resultsDiv = document.getElementById("results");
+                resultsDiv.innerHTML = "";
+                if (data.length === 0) {
+                    resultsDiv.innerHTML = "<p>No recipes found.</p>";
+                } else {
+                    data.forEach(function(recipe) {
+                        var recipeDiv = document.createElement("div");
+                        recipeDiv.className = "recipe";
+                        recipeDiv.innerHTML = `
+                            <h3>${recipe.recipe_name}</h3>
+                            <img src="${recipe.image_url}" alt="${recipe.recipe_name}">
+                            <p>Rating: ${recipe.aver_rate} (${recipe.review_nums} reviews)</p>
+                            <p>Calories: ${recipe.calories}</p>
+                            <p>Fat: ${recipe.fat}g, Carbs: ${recipe.carbohydrates}g, Protein: ${recipe.protein}g</p>
+                            <p>Similarity Score: ${recipe.similarity.toFixed(2)}</p>
+                        `;
+                        resultsDiv.appendChild(recipeDiv);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
+        });
+    </script>
+</body>
+</html>

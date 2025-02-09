@@ -1,0 +1,9 @@
+The model is built using a Nearest Neighbors (KNN) algorithm with cosine similarity as the distance metric. Here’s a quick breakdown:
+
+TF‑IDF Vectorization:
+The recipe ingredients (converted into plain text) are transformed into numerical feature vectors using TF‑IDF (Term Frequency-Inverse Document Frequency).
+
+Nearest Neighbors Algorithm:
+The Nearest Neighbors algorithm (from scikit-learn) is then used to find the recipe whose TF‑IDF vector is closest (based on cosine similarity) to the vector of the user-provided ingredients.
+
+This approach is a content-based filtering method that retrieves recipes similar to the input ingredients without relying on class labels.

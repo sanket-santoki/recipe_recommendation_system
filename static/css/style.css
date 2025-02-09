@@ -1,0 +1,96 @@
+/* General Styles */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f8f8;
+    margin: 0;
+    padding: 20px;
+  }
+  
+  header {
+    background-color: #333;
+    color: #fff;
+    padding: 15px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  .input-container {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  #ingredients {
+    width: 300px;
+    padding: 10px;
+    font-size: 16px;
+  }
+  
+  #get-rec-btn {
+    padding: 10px 20px;
+    font-size: 16px;
+    margin-left: 10px;
+    cursor: pointer;
+  }
+  
+  /* Recipe Card Styles */
+  #recipes-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  .recipe-card {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+  
+  .recipe-card img {
+    width: 100%;
+    border-radius: 5px;
+    margin-bottom: 10px;
+  }
+  
+  .recipe-info {
+    margin-bottom: 10px;
+  }
+  
+  .recipe-info h2 {
+    margin: 0 0 10px 0;
+    font-size: 20px;
+  }
+  
+  .recipe-info p {
+    margin: 5px 0;
+  }
+  
+  /* Chip Styles */
+  .chips-container {
+    margin: 10px 0;
+  }
+  
+  .chip {
+    display: inline-block;
+    padding: 8px 12px;
+    margin: 4px;
+    border-radius: 16px;
+    font-size: 14px;
+    color: #fff;
+  }
+  
+  .chip.available {
+    background-color: #66bb6a;  /* green */
+  }
+  
+  .chip.missing {
+    background-color: #ef5350;  /* red */
+  }
+  
+  /* Similarity Score */
+  .similarity {
+    margin-top: 10px;
+    font-weight: bold;
+  }
+  
