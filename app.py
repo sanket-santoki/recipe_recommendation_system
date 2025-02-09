@@ -38,6 +38,8 @@ def get_recipe_ingredients(ing):
 nn_model, vectorizer, df = load_models()
 
 # Streamlit UI
+st.set_page_config(page_title="Recipe Recommendation System", page_icon="🍽️", layout="wide")
+
 st.title("🍽️ Recipe Recommendation System")
 st.write("Enter the ingredients you have, and get personalized recipe recommendations!")
 
@@ -69,11 +71,18 @@ if st.button("Get Recommendations"):
 
             try:
                 rec = {
+                    "recipe_id": int(row["recipe_id"]),
                     "recipe_name": row["recipe_name"],
                     "image_url": row["image_url"],
                     "aver_rate": float(row["aver_rate"]),
                     "review_nums": int(row["review_nums"]),
                     "calories": float(row["calories"]),
+                    "fat": float(row["fat"]),
+                    "carbohydrates": float(row["carbohydrates"]),
+                    "protein": float(row["protein"]),
+                    "cholesterol": float(row["cholesterol"]),
+                    "sodium": float(row["sodium"]),
+                    "fiber": float(row["fiber"]),
                     "ingredients_list": recipe_ingredients,
                     "available_ingredients": available,
                     "missing_ingredients": missing,
@@ -86,14 +95,33 @@ if st.button("Get Recommendations"):
         # Display results
         if recommendations:
             st.subheader("Recommended Recipes:")
+            
             for recipe in recommendations:
-                st.markdown(f"### 🍲 {recipe['recipe_name']}")
-                st.image(recipe["image_url"], width=250)
-                st.write(f"**Rating:** {recipe['aver_rate']} ⭐ ({recipe['review_nums']} reviews)")
-                st.write(f"**Calories:** {recipe['calories']} kcal")
-                st.write(f"**Ingredients Available:** {', '.join(recipe['available_ingredients'])}")
-                st.write(f"**Missing Ingredients:** {', '.join(recipe['missing_ingredients'])}")
-                st.write("---")
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    st.image(recipe["image_url"], width=200)
+                
+                with col2:
+                    st.markdown(f"### 🍲 {recipe['recipe_name']}")
+                    st.write(f"**⭐ Rating:** {recipe['aver_rate']} / 5 ({recipe['review_nums']} reviews)")
+                    st.write(f"**🔥 Calories:** {recipe['calories']} kcal")
+                    st.write(f"**🍽️ Similarity Score:** {recipe['similarity']}")
+                    
+                    # Ingredients section
+                    with st.expander("✅ Available Ingredients"):
+                        st.write(", ".join(recipe["available_ingredients"]) if recipe["available_ingredients"] else "None")
+                    
+                    with st.expander("❌ Missing Ingredients"):
+                        st.write(", ".join(recipe["missing_ingredients"]) if recipe["missing_ingredients"] else "None")
+                    
+                    # Nutritional Information
+                    st.markdown("### 🥗 Nutritional Breakdown")
+                    st.write(f"**Fat:** {recipe['fat']} g | **Carbohydrates:** {recipe['carbohydrates']} g")
+                    st.write(f"**Protein:** {recipe['protein']} g | **Cholesterol:** {recipe['cholesterol']} mg")
+                    st.write(f"**Sodium:** {recipe['sodium']} mg | **Fiber:** {recipe['fiber']} g")
+
+                    st.write("---")
         else:
             st.warning("No matching recipes found. Try different ingredients.")
     else:
