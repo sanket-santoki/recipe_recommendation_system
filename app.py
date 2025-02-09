@@ -48,11 +48,16 @@ st.write("Enter the ingredients you have, and get personalized recipe recommenda
 
 # Autocomplete dropdown for ingredients with auto-close feature
 selected_ingredients = st.multiselect(
-    "Select Ingredients:", 
-    options=ingredient_list, 
+    "Select Ingredients:",
+    options=ingredient_list,
     default=[],
-    placeholder="Start typing to search ingredients..."
+    placeholder="Start typing to search ingredients...",
+    key="ingredient_selection"
 )
+
+# Force refresh by resetting key after selection
+if selected_ingredients:
+    st.session_state.ingredient_selection = selected_ingredients
 
 # Inject JavaScript to auto-close dropdown after selection
 st.markdown(
