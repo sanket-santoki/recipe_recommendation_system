@@ -5,9 +5,8 @@ import ast
 import logging
 import plotly.express as px
 
-# ✅ Set Streamlit Page Configuration (MUST be the first Streamlit command)
-st.set_page_config(page_title="🍽️ Recipe Recommendation System", 
-                   page_icon="🥗", layout="wide")
+# ✅ Set Streamlit Page Configuration
+st.set_page_config(page_title="🍽️ Recipe Finder", page_icon="🥗", layout="wide")
 
 # ✅ Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,36 +23,36 @@ except Exception as e:
     st.error("⚠️ Failed to load the model. Please check the files.")
     st.stop()
 
-# ✅ Function to convert ingredients into a list
-def get_recipe_ingredients(ing):
-    if isinstance(ing, list):
-        return ing
-    if isinstance(ing, str):
-        try:
-            parsed = ast.literal_eval(ing)
-            return list(parsed) if isinstance(parsed, (list, tuple)) else [str(parsed)]
-        except Exception as e:
-            logger.warning("literal_eval failed for input '%s': %s", ing, e)
-            return [item.strip().strip("'\"") for item in ing.strip("[]").split(",") if item.strip()]
-    return []
+# ✅ Extract unique ingredients for suggestions
+all_ingredients = set()
+for ing_list in df["ingredients_list"]:
+    try:
+        parsed_ing = ast.literal_eval(ing_list)
+        if isinstance(parsed_ing, list):
+            all_ingredients.update(parsed_ing)
+    except Exception as e:
+        logger.warning("Failed to parse ingredient list: %s", e)
+
+all_ingredients = sorted(all_ingredients)  # Sort for better user experience
 
 # ✅ Sidebar for User Input
 st.sidebar.header("🔍 Search for Recipes")
-ingredients = st.sidebar.text_input("Enter ingredients (comma-separated):", "")
 
-# Optional filters
-calories_limit = st.sidebar.slider("Max Calories", 50, 1000, 500)
-protein_min = st.sidebar.slider("Min Protein (g)", 0, 100, 10)
+# 🔥 **Autocomplete Ingredient Selection**
+selected_ingredients = st.sidebar.multiselect(
+    "Enter ingredients (Start typing...)", 
+    options=all_ingredients, 
+    default=[]
+)
 
 # 🔍 Button to trigger recommendation
 if st.sidebar.button("Find Recipes 🍽️"):
-    if not ingredients.strip():
-        st.sidebar.error("⚠️ Please enter at least one ingredient.")
+    if not selected_ingredients:
+        st.sidebar.error("⚠️ Please select at least one ingredient.")
     else:
         # ✅ Preprocess user input
-        user_list = [s.strip().lower() for s in ingredients.split(",") if s.strip()]
-        user_text = " ".join(user_list)
-        user_set = set(user_list)
+        user_text = " ".join(selected_ingredients)
+        user_set = set(selected_ingredients)
 
         try:
             user_vector = vectorizer.transform([user_text])
@@ -66,14 +65,10 @@ if st.sidebar.button("Find Recipes 🍽️"):
         recommendations = []
         for idx, dist in zip(indices[0], distances[0]):
             row = df.iloc[idx]
-            recipe_ingredients = list(get_recipe_ingredients(row["ingredients_list"]))
-            recipe_set = set(s.strip().lower() for s in recipe_ingredients)
+            recipe_ingredients = list(ast.literal_eval(row["ingredients_list"]))
+            recipe_set = set(recipe_ingredients)
             available = list(recipe_set.intersection(user_set))
             missing = list(recipe_set - user_set)
-
-            # ✅ Apply filters
-            if row["calories"] > calories_limit or row["protein"] < protein_min:
-                continue
 
             try:
                 rec = {
@@ -92,7 +87,8 @@ if st.sidebar.button("Find Recipes 🍽️"):
                     "ingredients_list": recipe_ingredients,
                     "available_ingredients": available,
                     "missing_ingredients": missing,
-                    "similarity": round(1 - dist, 2)
+                    "similarity": round(1 - dist, 2),
+                    "recipe_link": f"https://www.allrecipes.com/search?q={row['recipe_name'].replace(' ', '+')}"
                 }
             except Exception as e:
                 logger.error("Error constructing recipe for id %s: %s", row["recipe_id"], e)
@@ -110,7 +106,6 @@ if st.sidebar.button("Find Recipes 🍽️"):
                     with col1:
                         st.image(recipe["image_url"], width=200)
                     with col2:
-                        st.write(f"**📊 Similarity:** {recipe['similarity']*100:.1f}%")
                         st.write(f"**📌 Reviews:** {recipe['review_nums']} reviews")
                         st.write(f"🔥 **Calories:** {recipe['calories']} kcal")
                         st.write(f"🍗 **Protein:** {recipe['protein']} g")
@@ -123,19 +118,24 @@ if st.sidebar.button("Find Recipes 🍽️"):
                     # ✅ Show Available & Missing Ingredients
                     st.markdown("✅ **Available Ingredients:** " + ", ".join(recipe["available_ingredients"]))
                     st.markdown("❌ **Missing Ingredients:** " + ", ".join(recipe["missing_ingredients"]))
+                    
+                    # ✅ Recipe Link
+                    st.markdown(f"🔗 **[View Full Recipe]({recipe['recipe_link']})**", unsafe_allow_html=True)
 
                 st.markdown("---")  # Separator
 
-            # ✅ Interactive Nutritional Chart
-            st.subheader("📊 Nutritional Comparison of Recommended Recipes")
-            df_rec = pd.DataFrame(recommendations[:5])  # Convert to DataFrame
-            fig = px.bar(df_rec, x="recipe_name", y=["calories", "protein", "carbohydrates", "fat"], 
-                         title="Nutritional Breakdown", labels={"value": "Amount", "variable": "Nutrient"},
-                         barmode="group", height=400)
+            # ✅ Pie Chart for Ingredient Contribution
+            st.subheader("📊 Ingredient Contribution in Recommended Recipes")
+            all_ing = []
+            for recipe in recommendations[:5]:
+                all_ing.extend(recipe["ingredients_list"])
+            ing_df = pd.DataFrame({"Ingredient": all_ing})
+            fig = px.pie(ing_df, names="Ingredient", title="Ingredient Contribution",
+                         hole=0.3, color_discrete_sequence=px.colors.qualitative.Pastel)
             st.plotly_chart(fig, use_container_width=True)
 
         else:
-            st.warning("😕 No recipes match your filters. Try adjusting them.")
+            st.warning("😕 No recipes match your ingredients. Try different ones!")
 
 # ✅ Footer
 st.markdown("---")
